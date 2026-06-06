@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.edu.seig.MhWeb.mapper.PictureMapper">
+    <!-- 根据删除条件查询图片列表 -->
+    <select id="selectByDeleteDTO" resultType="cn.edu.seig.MhWeb.model.entity.Picture">
+        SELECT * FROM mh_picture
+        <where>
+            <!-- 优先使用图片ID -->
+            <if test="picId != null">
+                AND id = #{picId}
+            </if>
+            <!-- 其次使用内容ID -->
+            <if test="picId == null and contentId != null">
+                AND content_id = #{contentId}
+                <if test="type != null">
+                    AND type = #{type}
+                </if>
+            </if>
+            <!-- 其次使用菌种ID -->
+            <if test="picId == null and contentId == null and mushroomId != null">
+                AND mushroom_id = #{mushroomId}
+                <if test="type != null">
+                    AND type = #{type}
+                </if>
+            </if>
+            <!-- 其次使用病虫害ID -->
+            <if test="picId == null and contentId == null and mushroomId == null and diseaseId != null">
+                AND disease_id = #{diseaseId}
+                <if test="type != null">
+                    AND type = #{type}
+                </if>
+            </if>
+        </where>
+    </select>
+
+    <!-- 根据删除条件删除图片 -->
+    <delete id="deleteByDeleteDTO">
+        DELETE FROM mh_picture
+        <where>
+            <!-- 优先使用图片ID -->
+            <if test="picId != null">
+                AND id = #{picId}
+            </if>
+            <!-- 其次使用内容ID -->
+            <if test="picId == null and contentId != null">
+                AND content_id = #{contentId}
+                <if test="type != null">
+                    AND type = #{type}
+                </if>
+            </if>
+            <!-- 其次使用菌种ID -->
+            <if test="picId == null and contentId == null and mushroomId != null">
+                AND mushroom_id = #{mushroomId}
+                <if test="type != null">
+                    AND type = #{type}
+                </if>
+            </if>
+            <!-- 其次使用病虫害ID -->
+            <if test="picId == null and contentId == null and mushroomId == null and diseaseId != null">
+                AND disease_id = #{diseaseId}
+                <if test="type != null">
+                    AND type = #{type}
+                </if>
+            </if>
+        </where>
+    </delete>
+</mapper>

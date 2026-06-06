@@ -1,0 +1,294 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.edu.seig.MhWeb.mapper.PopSciContentMapper">
+    <!-- ===================================== 通用结果映射（复用） ===================================== -->
+    <!-- ===================================== 通用结果映射（完全匹配 DDL 字段） ===================================== -->
+    <resultMap id="PopSciContentResultMap" type="cn.edu.seig.MhWeb.model.entity.PopSciContent">
+        <id column="id" property="id"/>
+        <result column="mushroom_id" property="mushroomId"/>
+        <result column="content_type" property="contentType"/>
+        <result column="title" property="title"/>
+        <result column="author_id" property="authorId"/>
+        <result column="publish_date" property="publishDate"/>
+        <result column="praise_count" property="praiseCount"/>
+        <result column="review_count" property="reviewCount"/>
+        <result column="collect_count" property="collectCount"/>
+        <result column="content" property="content"/>
+        <result column="video_url" property="videoUrl"/>
+        <result column="description" property="description"/>
+        <result column="source_url" property="sourceUrl"/>
+        <result column="content_status" property="contentStatus"/>
+        <result column="audit_time" property="auditTime"/>
+        <result column="reject_reason" property="rejectReason"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+    <!-- 基础字段 -->
+    <sql id="Base_Column_List">
+        id, mushroom_id, content_type, title, author_id, publish_date,
+        praise_count, review_count, collect_count, content, video_url, description,
+        source_url, content_status, audit_time, reject_reason, create_time
+    </sql>
+
+    <!-- 权重计算SQL片段 -->
+    <sql id="Weight_Calc">
+        -- 日期权重：近7天=5，近30天=3，近90天=1，其他=0.5
+        CASE
+            WHEN publish_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) THEN 5
+            WHEN publish_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) THEN 3
+            WHEN publish_date >= DATE_SUB(CURDATE(), INTERVAL 90 DAY) THEN 1
+            ELSE 0.5
+        END +
+        -- 点赞权重：praise_count/100
+        (praise_count / 100) +
+        -- 评论权重：review_count/50
+        (review_count / 50)
+    </sql>
+    <!-- ===================================== 按类型查询随机科普内容（核心修复 LIMIT 报错） ===================================== -->
+    <select id="getRandomPopSciContentsByType" resultMap="PopSciContentResultMap">
+        SELECT
+        id,
+        mushroom_id,
+        content_type,
+        title,
+        author_id,
+        publish_date,
+        praise_count,
+        review_count,
+        collect_count,
+        content,
+        video_url,
+        description,
+        source_url,
+        content_status,
+        audit_time,
+        reject_reason,
+        create_time
+        FROM mh_popsci_content
+        WHERE 1=1
+        <!-- 仅展示审核通过的内容（匹配 DDL 的 content_status=2） -->
+        AND content_status = 2
+        <!-- 内容类型筛选：兼容 DDL 的 article/video，排除 NULL -->
+        AND content_type = #{contentType}
+        <!-- 随机排序 + LIMIT 放在最后，解决语法错误 -->
+        ORDER BY RAND()
+        LIMIT #{limit}
+    </select>
+
+    <!-- ===================================== 查询收藏内容关联的菌种ID ===================================== -->
+    <select id="getFavoriteMushroomIds" resultType="java.lang.Long">
+        SELECT mushroom_id
+        FROM mh_popsci_content
+        WHERE id IN
+        <foreach collection="favoriteContentIds" item="contentId" open="(" separator="," close=")">
+            #{contentId}
+        </foreach>
+        AND mushroom_id IS NOT NULL
+        AND content_status = 2 <!-- 仅取审核通过的内容 -->
+    </select>
+
+    <!-- ===================================== 按菌种ID推荐内容（无类型筛选） ===================================== -->
+    <select id="getRecommendedByMushroomIds" resultMap="PopSciContentResultMap">
+        SELECT
+        id,
+        mushroom_id,
+        content_type,
+        title,
+        author_id,
+        publish_date,
+        praise_count,
+        review_count,
+        collect_count,
+        content,
+        video_url,
+        description,
+        source_url,
+        content_status,
+        audit_time,
+        reject_reason,
+        create_time
+        FROM mh_popsci_content
+        WHERE 1=1
+        AND mushroom_id IN
+        <foreach collection="sortedMushroomIds" item="mushroomId" open="(" separator="," close=")">
+            #{mushroomId}
+        </foreach>
+        AND id NOT IN
+        <foreach collection="favoriteContentIds" item="contentId" open="(" separator="," close=")">
+            #{contentId}
+        </foreach>
+        AND content_status = 2 <!-- 仅展示审核通过的内容 -->
+        <!-- 按菌种优先级排序（FIELD 语法正确） -->
+        ORDER BY FIELD(mushroom_id,
+        <foreach collection="sortedMushroomIds" item="mushroomId" separator=",">
+            #{mushroomId}
+        </foreach>
+        ) DESC,
+        <!-- LIMIT 放在最后，避免语法错误 -->
+        LIMIT #{limit}
+    </select>
+
+    <!-- ===================================== 按菌种ID+内容类型推荐内容 ===================================== -->
+    <select id="getRecommendedByMushroomIdsAndType" resultMap="PopSciContentResultMap">
+        SELECT
+        id,
+        mushroom_id,
+        content_type,
+        title,
+        author_id,
+        publish_date,
+        praise_count,
+        review_count,
+        collect_count,
+        content,
+        video_url,
+        description,
+        source_url,
+        content_status,
+        audit_time,
+        reject_reason,
+        create_time
+        FROM mh_popsci_content
+        WHERE 1=1
+        AND mushroom_id IN
+        <foreach collection="sortedMushroomIds" item="mushroomId" open="(" separator="," close=")">
+            #{mushroomId}
+        </foreach>
+        AND content_type = #{contentType}
+        AND id NOT IN
+        <foreach collection="favoriteContentIds" item="contentId" open="(" separator="," close=")">
+            #{contentId}
+        </foreach>
+        AND content_status = 2 <!-- 仅展示审核通过的内容 -->
+        <!-- 按菌种优先级排序 -->
+        ORDER BY FIELD(mushroom_id,
+        <foreach collection="sortedMushroomIds" item="mushroomId" separator=",">
+            #{mushroomId}
+        </foreach>
+        ) DESC,
+        <!-- LIMIT 放在最后，解决语法报错 -->
+        LIMIT #{limit}
+    </select>
+    <select id="getRandomHighWeightContentByType" resultType="cn.edu.seig.MhWeb.model.entity.PopSciContent">
+        SELECT <include refid="Base_Column_List"/>
+        FROM mh_popsci_content
+        WHERE content_type = #{contentType}
+        AND content_status = 2 -- 仅审核通过
+        AND publish_date IS NOT NULL
+        ORDER BY (<include refid="Weight_Calc"/>) DESC, RAND() -- 先按权重降序，再随机
+        LIMIT #{targetCount};
+    </select>
+    <!-- 按菌种+类型+权重推荐（排除已收藏） -->
+    <select id="getRecommendedByMushroomIdsAndTypeWithWeight" resultType="cn.edu.seig.MhWeb.model.entity.PopSciContent">
+        SELECT <include refid="Base_Column_List"/>
+        FROM mh_popsci_content
+        WHERE mushroom_id IN
+        <foreach collection="sortedMushroomIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        AND content_type = #{contentType}
+        AND content_status = 2 -- 仅审核通过
+        AND id NOT IN
+        <foreach collection="favoriteContentIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        -- 4. 只推荐已审核通过的内容
+        AND content_status = 2
+        ORDER BY
+        -- 核心：直接写死权重计算公式（点赞*0.6 + 收藏*0.3 + 评论*0.1）
+        (COALESCE(praise_count, 0) * 0.6 +
+        COALESCE(collect_count, 0) * 0.3 +
+        COALESCE(review_count, 0) * 0.1) DESC,
+        publish_date DESC
+        LIMIT #{candidateCount}
+    </select>
+    <select id="getFavoriteContentIdsByUserId" resultType="java.lang.Long">
+        SELECT popsci_id FROM mh_user_favorite_popsci WHERE user_id = #{userId};
+    </select>
+    <!--
+  科普内容分页/列表动态查询（新增标题+描述模糊查询）
+  参数说明：
+  - mushroomId: 菌种ID（对应表字段mushroom_id）
+  - contentType: 内容类型（article/video，对应表字段content_type）
+  - authorId: 科普号ID（对应表字段author_id）
+  - contentStatus: 内容状态（1=待审核/2=审核通过/3=审核驳回）
+  - keyword: 模糊查询关键词（匹配标题/描述，可为空）
+  注：所有参数均可为空，MyBatis会自动忽略空条件
+-->
+    <select id="pageQuery" resultType="cn.edu.seig.MhWeb.model.entity.PopSciContent"> <!-- 替换为你的真实实体类路径 -->
+        SELECT
+        id, mushroom_id, content_type, title, author_id, publish_date,
+        praise_count, review_count, collect_count, content, video_url,
+        description, source_url, content_status, audit_time, reject_reason, create_time
+        FROM mh_popsci_content
+        <where>
+            <!-- 1. 新增：标题+描述模糊查询（OR逻辑） -->
+            <if test="keyword != null and keyword != ''">
+                AND (
+                        title LIKE CONCAT('%', #{keyword}, '%')
+                        OR description LIKE CONCAT('%', #{keyword}, '%')
+                    )
+            </if>
+
+            <!-- 2. 原有条件：菌种ID -->
+            <if test="mushroomId != null">
+                AND mushroom_id = #{mushroomId}
+            </if>
+
+            <!-- 3. 原有条件：内容类型 -->
+            <if test="contentType != null and contentType != ''">
+                AND content_type = #{contentType}
+            </if>
+
+            <!-- 4. 原有条件：科普号ID -->
+            <if test="authorId != null">
+                AND author_id = #{authorId}
+            </if>
+
+            <!-- 5. 原有条件：内容状态 -->
+            <if test="contentStatus != null">
+                AND content_status = #{contentStatus}
+            </if>
+        </where>
+        <!-- 业务合理排序：优先按发布日期降序，其次按入库时间降序 -->
+        ORDER BY publish_date DESC, create_time DESC
+    </select>
+    <select id="selectUserContentSummary" resultType="cn.edu.seig.MhWeb.model.vo.PopSciContentSummaryVO">
+        SELECT
+        c.id,
+        c.content_type as contentType,
+        c.title,
+        u.username as authorName,
+        c.publish_date as publishDate,
+        c.content_status as contentStatus,
+        c.description,
+        m.mushroom_name as mushroomName,
+        -- 取第一个图片作为封面
+        (SELECT p.pic_url FROM mh_picture p
+        WHERE p.content_id = c.id
+        AND p.type = '图文详情图'
+        LIMIT 1) as articleCoverUrl,
+        (SELECT p.pic_url FROM mh_picture p
+        WHERE p.content_id = c.id
+        AND p.type = '视频封面'
+        LIMIT 1) as videoCoverUrl
+        FROM mh_popsci_content c
+        LEFT JOIN mh_user u ON c.author_id = u.user_id
+        LEFT JOIN mh_mushroom_info m ON c.mushroom_id = m.id
+        WHERE c.author_id = #{dto.userId}
+        <if test="dto.mediaType != null and dto.mediaType.code !=  ''">
+            AND c.content_type = #{dto.mediaType.code}
+        </if>
+        ORDER BY c.publish_date DESC
+        LIMIT #{dto.pageSize} OFFSET #{offset} -- 分页（offset = (pageNum-1)*pageSize）
+    </select>
+
+    <!-- 查询用户笔记总数（用于分页） -->
+    <select id="countUserContent" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM mh_popsci_content c
+        WHERE c.author_id = #{dto.userId}
+        <if test="dto.mediaType != null and dto.mediaType.code !=  ''">
+            AND c.content_type = #{dto.mediaType.code}
+        </if>
+    </select>
+</mapper>

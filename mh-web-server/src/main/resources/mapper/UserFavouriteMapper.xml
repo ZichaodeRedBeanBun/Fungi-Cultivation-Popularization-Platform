@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.edu.seig.MhWeb.mapper.UserFavouriteMapper">
+
+    <!-- 根据用户ID和科普内容ID查询收藏记录 -->
+    <select id="selectByUserIdAndPopsciId" resultType="cn.edu.seig.MhWeb.model.entity.UserFavourite">
+        select * from mh_user_favorite_popsci
+        where user_id = #{userId}
+        and popsci_id = #{popsciId}
+    </select>
+    <!-- 根据用户ID、收藏类型、菌种ID查询收藏的科普内容ID -->
+    <select id="selectPopsciIdsByUserIdAndType" resultType="java.lang.Long">
+        SELECT popsci_id FROM mh_user_favorite_popsci
+        WHERE user_id = #{userId}
+        <!-- 原有：收藏类型条件 -->
+        <if test="dto.favoriteType != null and dto.favoriteType != ''">
+            AND favorite_type = #{dto.favoriteType}
+        </if>
+        <!-- 新增：菌种ID条件（非空则过滤） -->
+        <if test="dto.mushroomId != null">
+            AND mushroom_id = #{dto.mushroomId}
+        </if>
+    </select>
+    <!-- 2. 批量查询收藏的科普内容（关联作者、菌种、图片，直接返回精简VO所需字段） -->
+    <select id="selectPopSciSummaryByPopsciIds" resultType="cn.edu.seig.MhWeb.model.vo.PopSciContentSummaryVO">
+        SELECT
+        c.id,
+        c.content_type as contentType,
+        c.title,
+        u.username as authorName,
+        c.publish_date as publishDate,
+        c.description,
+        m.mushroom_name as mushroomName,
+        -- 取第一个图片作为封面（图文/视频区分）
+        (SELECT p.pic_url FROM mh_picture p
+        WHERE p.content_id = c.id
+        AND p.type = '图文详情图'
+        LIMIT 1) as articleCoverUrl,
+        (SELECT p.pic_url FROM mh_picture p
+        WHERE p.content_id = c.id
+        AND p.type = '视频封面'
+        LIMIT 1) as videoCoverUrl
+        FROM mh_popsci_content c
+        LEFT JOIN mh_user u ON c.author_id = u.user_id
+        LEFT JOIN mh_mushroom_info m ON c.mushroom_id = m.id
+        WHERE c.id IN
+        <foreach collection="popsciIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        AND c.content_status = 2 -- 仅审核通过
+        ORDER BY c.publish_date DESC
+    </select>
+
+
+</mapper>
