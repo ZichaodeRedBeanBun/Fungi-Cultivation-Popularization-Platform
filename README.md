@@ -89,3 +89,10 @@ mh-web-server/
 
 
 默认启动端口为 **8081**。
+部分页面截图
+
+<img width="750" height="380" alt="image" src="https://github.com/user-attachments/assets/5b4f1461-c010-4447-9e3b-89f9469fd5b0" />
+<img width="750" height="380" alt="image" src="https://github.com/user-attachments/assets/454c2a93-447b-459e-bc9b-508f61e093a7" />
+<img width="750" height="380" alt="image" src="https://github.com/user-attachments/assets/1263905c-f5be-4cf8-9c58-5993833af120" />
+
+
